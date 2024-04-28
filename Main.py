@@ -8,6 +8,7 @@ from Instancia import *
 # Modelos de Objetos
 MeiaSeta = Polygon()
 Player = Polygon()
+Tiro = Polygon()
 
 # Pontos de controle de uma curva Bezier
 Curva1 = []
@@ -52,16 +53,45 @@ def reshape(w,h):
     glMatrixMode (GL_MODELVIEW)
     glLoadIdentity()
 
-def DesenhaPlayer():
-    Player.desenhaPixel()
+def DesenhaPixel(entidade):
     glPushMatrix()
-    glTranslated(0,3,0)
+    glRotatef(-90 + Personagens[0].rotacao,0,0,1)
+    glTranslatef(Personagens[0].pivot.x,Personagens[0].pivot.y,0)
+    for Vertice,indexCor in entidade.Vertices:
+        glBegin(GL_QUADS)
+        cor = ListaCor.pegaCor(indexCor)
+        glColor3f(cor[0],cor[1],cor[2])
+        glVertex2f(Vertice.x, Vertice.y)
+        glVertex2f(Vertice.x + 1, Vertice.y)
+        glVertex2f(Vertice.x + 1, Vertice. y+1)
+        glVertex2f(Vertice.x, Vertice.y + 1)
+        glEnd()
+    glPopMatrix()
+
+def DesenhaPlayerUI(entidade):
+    glRotatef(-90,0,0,1)
+    for Vertice,indexCor in entidade.Vertices:
+        glBegin(GL_QUADS)
+        cor = ListaCor.pegaCor(indexCor)
+        glColor3f(cor[0],cor[1],cor[2])
+        glVertex2f(Vertice.x, Vertice.y)
+        glVertex2f(Vertice.x + 1, Vertice.y)
+        glVertex2f(Vertice.x + 1, Vertice. y+1)
+        glVertex2f(Vertice.x, Vertice.y + 1)
+        glEnd()
+
+def DesenhaPlayer():
+    DesenhaPixel(Player)
+    glPushMatrix()
     glScaled(0.2, 0.2, 1)
     glPopMatrix()
 
+def DesenhaTiro():
+    Tiro.DesenhaPixel()
+
 # **************************************************************
 
-def DesenhaVidasDoJogador(x, y, number):
+def DesenhaNumero(x, y, number):
     glLoadIdentity()
     glPushMatrix()
     glTranslatef(x, y, 0.0)
@@ -216,9 +246,8 @@ def DesenhaUI():
     glPushMatrix()
     glTranslatef(UIReferenceX,UIReferenceY,0)
     glScaled(0.2, 0.2, 1)
-    glRotatef(-90, 0, 0, 1)
-    Player.desenhaPixel()
-    DesenhaVidasDoJogador(UIReferenceX + (Max.x / 4) , UIReferenceY - 0.6 , Vidas)
+    DesenhaPlayerUI(Player)
+    DesenhaNumero(UIReferenceX + (Max.x / 4) , UIReferenceY - 0.6 , Vidas)
     glPopMatrix()
 
 
@@ -282,17 +311,19 @@ def keyboard(*args):
 # **********************************************************************
 def arrow_keys(a_keys: int, x: int, y: int):
     if a_keys == GLUT_KEY_UP:         # Se pressionar UP
-        Personagens[0].vetor.y = 0.1
+        Personagens[0].vetor.y = 0.01
         Personagens[0].rotacao = 0
+        Personagens[0].pivot = Ponto(-4,-8,0)
     if a_keys == GLUT_KEY_DOWN:       # Se pressionar DOWN
-        Personagens[0].vetor.y = -0.1
-        Personagens[0].rotacao = 90
+        Personagens[0].vetor.y = -0.01
+        Personagens[0].rotacao = 180
+        #Personagens[0].pivot = Ponto(1.5,-0.5,0)
     if a_keys == GLUT_KEY_LEFT:       # Se pressionar LEFT
-        Personagens[0].vetor.x = -0.1
-        Personagens[0].rotacao += 20
+        Personagens[0].vetor.x = -0.01
+        Personagens[0].rotacao += 30
     if a_keys == GLUT_KEY_RIGHT:
-        Personagens[0].vetor.x = 0.1
-        Personagens[0].rotacao -= -20      # Se pressionar RIGHT
+        Personagens[0].vetor.x = 0.01
+        Personagens[0].rotacao -= 30
 
     glutPostRedisplay()
 
@@ -324,18 +355,20 @@ def mouseMove(x: int, y: int):
     return
 
 def CarregaModelos():
-    global Player
+    global Player, Tiro
+
+    
     Player.LePontosDeArquivo("Personagens\Player.txt")
-    #MeiaSeta.LePontosDeArquivo("Personagens\MeiaSeta.txt")
+    Tiro.LePontosDeArquivo("Personagens\Tiro.txt")
 
 def CriaInstancias():
     global Personagens
 
     Personagens.append(Instancia())
     Personagens[0].modelo = DesenhaPlayer
-    Personagens[0].rotacao = -90
-    Personagens[0].posicao = Ponto(1,1)
+    Personagens[0].posicao = Ponto(0,0)
     Personagens[0].escala = Ponto (0.2,0.2,1)
+    Personagens[0].pivot = Ponto(-4,-8,0)
 
 def init():
     global Min, Max

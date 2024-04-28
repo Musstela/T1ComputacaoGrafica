@@ -37,23 +37,6 @@ class Polygon:
             glVertex3f(V.x,V.y,V.z)
         glEnd()
 
-    def desenhaVertices(self):
-        glBegin(GL_POINTS)
-        for V in self.Vertices:
-            glVertex3f(V.x,V.y,V.z)
-        glEnd()
-
-    def desenhaPixel(self):
-        for Vertice,indexCor in self.Vertices:
-            glBegin(GL_QUADS)
-            cor = ListaCor.pegaCor(indexCor)
-            glColor3f(cor[0],cor[1],cor[2])
-            glVertex2f(Vertice.x, Vertice.y)
-            glVertex2f(Vertice.x + 1, Vertice.y)
-            glVertex2f(Vertice.x + 1, Vertice. y+1)
-            glVertex2f(Vertice.x, Vertice.y + 1)
-            glEnd()
-
     def imprimeVertices(self):
         for x in self.Vertices:
             x.imprime()

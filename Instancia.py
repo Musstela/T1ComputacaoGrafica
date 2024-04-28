@@ -9,7 +9,8 @@ class Instancia:
         self.posicao = Ponto (0,0,0) 
         self.escala = Ponto (1,1,1)
         self.rotacao:float = 0.0
-        self.vetor = Ponto(0,0.1)
+        self.vetor = Ponto(0,0.01)
+        self.pivot:Ponto
         self.modelo = None
         self.t = 0.0
     
@@ -27,19 +28,14 @@ class Instancia:
         self.modelo = func
 
     def Desenha(self):
-        #print ("Desenha")
-        #self.escala.imprime("\tEscala: ")
-        #print ("\tRotacao: ", self.rotacao)
         glLoadIdentity()
         glPushMatrix()
         
         self.posicao.x += self.vetor.x
         self.posicao.y += self.vetor.y
 
+        print(self.rotacao)
         glTranslatef(self.posicao.x, self.posicao.y, 0)
-        glRotatef(self.rotacao, 0, 0, 1)
         glScalef(self.escala.x, self.escala.y, self.escala.z)
         self.modelo()
         glPopMatrix()
-
-    

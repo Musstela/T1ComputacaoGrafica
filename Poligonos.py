@@ -13,33 +13,18 @@ import copy
 
 class Polygon:
 
-    def __init__(self):
+    def __init__(self,nomeArquivo):
         self.Vertices = [] # atributo do objeto
-
-    def getNVertices(self):
-        return len(self.Vertices)
+        self.BoundingBox = []
+        self.nomeArquivo = nomeArquivo
+        self.LePontosDeArquivo()
     
     def insereVertice(self, x: float, y:float, z: float, cor: int):
         self.Vertices += [(Ponto(x,y,z),(cor))]
 
-    #def insereVertice(self, P: Ponto):
-    #    self.Vertices += [Ponto(P.x,P.y,P.z)]
-
     def getVertice(self, i):
         temp = copy.deepcopy(self.Vertices[i])
         return temp
-        #return self.Vertices[i]
-    
-    def desenhaPoligono(self):
-        #print ("Desenha Poligono - Tamanho:", len(self.Vertices))
-        glBegin(GL_LINE_LOOP)
-        for V in self.Vertices:
-            glVertex3f(V.x,V.y,V.z)
-        glEnd()
-
-    def imprimeVertices(self):
-        for x in self.Vertices:
-            x.imprime()
 
     def getLimits(self):
         Min = copy.deepcopy(self.Vertices[0][0])
@@ -58,19 +43,23 @@ class Polygon:
                 Min.y = Vertice.y
             if Vertice.z < Min.z:
                 Min.z = Vertice.z
-        #print("getLimits")
-        #Min.imprime()
-        #Max.imprime()
         return Min, Max
-#def setColor()
-# ***********************************************************************************
-# LePontosDeArquivo(Nome):
-#  Realiza a leitura de uam arquivo com as coordenadas do polígono
-# ***********************************************************************************
-    def LePontosDeArquivo(self, Nome):
+    
+    def DefineBoundingBox(self,matrix):
+        rows = len(matrix)
+        cols = len(matrix[0])
+
+        top_left = (0, 0)
+        top_right = (0, cols)
+        bottom_left = (rows, 0)
+        bottom_right = (rows, cols)
+
+        self.BoundingBox = [top_left, top_right, bottom_left, bottom_right]
+
+    def LePontosDeArquivo(self):
         
         Pt = Ponto()
-        infile = open(Nome)
+        infile = open(self.nomeArquivo)
         lines = infile.readlines()
         config = lines[0].strip().split()
         configRow = int(config[0])
@@ -81,7 +70,6 @@ class Polygon:
 
         for index,item in enumerate(lines):
             matriz[index] = item.strip().split() # Separa as palavras na linha
-        
 
         for indexLinha,linha in enumerate(matriz):
             for indexColuna,ponto in enumerate(linha):
@@ -89,8 +77,8 @@ class Polygon:
                     self.insereVertice(indexLinha,indexColuna,0,int(ponto))
 
         infile.close()
-        
-        print("Após leitura do arquivo:")
+
+        self.DefineBoundingBox(matriz)
 
         return self.getLimits()
 

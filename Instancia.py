@@ -2,17 +2,20 @@ from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
 from Ponto import *
+from Poligonos import *
 
-""" Classe Instancia """
 class Instancia:   
     def __init__(self):
         self.posicao = Ponto (0,0,0) 
         self.escala = Ponto (1,1,1)
         self.rotacao:float = 0.0
-        self.vetor = Ponto(0,0.01)
+        self.vetor = Ponto(0,0.5)
         self.pivot:Ponto
-        self.modelo = None
+        self.desenhaModelo:None
+        self.modelo:Polygon
         self.t = 0.0
+        self.ordem = 0
+        self.podeDesenhar = True
     
     """ Imprime os valores de cada eixo do ponto """
     # Faz a impressao usando sobrecarga de funcao
@@ -34,8 +37,7 @@ class Instancia:
         self.posicao.x += self.vetor.x
         self.posicao.y += self.vetor.y
 
-        print(self.rotacao)
         glTranslatef(self.posicao.x, self.posicao.y, 0)
-        glScalef(self.escala.x, self.escala.y, self.escala.z)
-        self.modelo()
+        if(self.desenhaModelo != None):
+            self.desenhaModelo(self.ordem,self.modelo)
         glPopMatrix()

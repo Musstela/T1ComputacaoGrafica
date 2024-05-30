@@ -1,14 +1,19 @@
 import time
+import random
+
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
+
 from Poligonos import *
 from Instancia import *
+#from QuadTree import *
 
 # Modelos de Objetos
-MeiaSeta = Polygon()
-Player = Polygon()
-Tiro = Polygon()
+Player = Polygon("Personagens\Player.txt")
+TiroPlayer = Polygon("Personagens\TiroPlayer.txt")
+TiroInimigo = Polygon("Personagens\TiroInimigo.txt")
+ListaDeModelos = []
 
 # Pontos de controle de uma curva Bezier
 Curva1 = []
@@ -19,9 +24,15 @@ Max = Ponto()
 
 # lista de instancias do Personagens
 Personagens = []
-Vidas = 3
+TirosPlayer = []
+TirosInimigos = []
+TotalTiro = 0
+PodeAtirar = True
+TempoParaAtirar = 90
 Municao = 10
-
+TempoTiroInimigo = 0
+Vidas = 3
+NumeroInicialDeInimigos = 0
 nFrames, TempoTotal, AccumDeltaT = 0, 0, 0
 oldTime = time.time()
 
@@ -36,8 +47,6 @@ def RotacionaAoRedorDeUmPonto(alfa: float, P: Ponto):
     glTranslatef(P.x, P.y, P.z)
     glRotatef(alfa, 0,0,1)
     glTranslatef(-P.x, -P.y, -P.z)
-
-
 # ***********************************************************************************
 def reshape(w,h):
 
@@ -53,20 +62,42 @@ def reshape(w,h):
     glMatrixMode (GL_MODELVIEW)
     glLoadIdentity()
 
-def DesenhaPixel(entidade):
-    glPushMatrix()
-    glRotatef(-90 + Personagens[0].rotacao,0,0,1)
-    glTranslatef(Personagens[0].pivot.x,Personagens[0].pivot.y,0)
-    for Vertice,indexCor in entidade.Vertices:
-        glBegin(GL_QUADS)
-        cor = ListaCor.pegaCor(indexCor)
-        glColor3f(cor[0],cor[1],cor[2])
-        glVertex2f(Vertice.x, Vertice.y)
-        glVertex2f(Vertice.x + 1, Vertice.y)
-        glVertex2f(Vertice.x + 1, Vertice. y+1)
-        glVertex2f(Vertice.x, Vertice.y + 1)
-        glEnd()
-    glPopMatrix()
+def DesenhaBoundingBox(points):
+    glBegin(GL_LINE_LOOP)
+    glColor3f(255,255,255)
+    glVertex2f(*points[0])  # Top left
+    glVertex2f(*points[1])  # Top right
+    glVertex2f(*points[3])  # Bottom right
+    glVertex2f(*points[2])  # Bottom left
+    glEnd()
+
+def DesenhaVetor(modelo):
+    boundingBox = modelo.BoundingBox
+    meioX = (boundingBox[3][0]) / 2
+    meioY = (boundingBox[3][1]) / 2
+    glBegin(GL_LINES) 
+    glColor3f(50,255,50)
+    glVertex2f(meioX,meioY)
+    glVertex2f(meioX - 10, meioY)
+    glEnd()
+
+def DesenhaPixel(instancia,modelo):
+    if(instancia.podeDesenhar == True):    
+        glPushMatrix()
+        glRotatef(-90 + instancia.rotacao,0,0,1)
+        glTranslatef(instancia.pivot.x,instancia.pivot.y,0)
+        #DesenhaBoundingBox(modelo.BoundingBox)
+        #DesenhaVetor(modelo)
+        for Vertice,indexCor in modelo.Vertices:
+            glBegin(GL_QUADS)
+            cor = ListaCor.pegaCor(indexCor)
+            glColor3f(cor[0],cor[1],cor[2])
+            glVertex2f(Vertice.x, Vertice.y)
+            glVertex2f(Vertice.x + 1, Vertice.y)
+            glVertex2f(Vertice.x + 1, Vertice. y+1)
+            glVertex2f(Vertice.x, Vertice.y + 1)
+            glEnd()
+        glPopMatrix()
 
 def DesenhaPlayerUI(entidade):
     glRotatef(-90,0,0,1)
@@ -80,21 +111,24 @@ def DesenhaPlayerUI(entidade):
         glVertex2f(Vertice.x, Vertice.y + 1)
         glEnd()
 
-def DesenhaPlayer():
-    DesenhaPixel(Player)
-    glPushMatrix()
-    glScaled(0.2, 0.2, 1)
-    glPopMatrix()
+def DesenhaPersonagem(ordem,modelo):
+    try:
+        DesenhaPixel(Personagens[ordem],modelo)
+    except IndexError:
+        Personagens
+        print(ordem)
 
-def DesenhaTiro():
-    Tiro.DesenhaPixel()
+def DesenhaTiroPlayer(ordem,modelo):
+    DesenhaPixel(TirosPlayer[ordem],modelo)
 
-# **************************************************************
-
+def DesenhaTiroInimigo(ordem,modelo):
+    DesenhaPixel(TirosInimigos[ordem],modelo)
+        
 def DesenhaNumero(x, y, number):
     glLoadIdentity()
     glPushMatrix()
     glTranslatef(x, y, 0.0)
+    glScale(5,4,0)
 
     glBegin(GL_LINES)
     if number == 0:
@@ -138,8 +172,8 @@ def DesenhaNumero(x, y, number):
         glVertex2f(-0.5, 0.0)
         glVertex2f(-0.5, 0.0)
         glVertex2f(0.5, 0.0)
-        glVertex2f(0.0, 0.5)
-        glVertex2f(0.0, -0.5)
+        glVertex2f(0.5, 0.5)
+        glVertex2f(0.5, -0.5)
     elif number == 5:
         glVertex2f(0.5, 0.5)
         glVertex2f(-0.5, 0.5)
@@ -166,34 +200,36 @@ def DesenhaNumero(x, y, number):
         glVertex2f(-0.5, 0.5)
         glVertex2f(0.5, 0.5)
         glVertex2f(0.5, 0.5)
-        glVertex2f(-0.5, -0.5)
+        glVertex2f(0.5, -0.5)
     elif number == 8:
         glVertex2f(-0.5, 0.5)
         glVertex2f(0.5, 0.5)
         glVertex2f(0.5, 0.5)
-        glVertex2f(0.5, 0.0)
-        glVertex2f(0.5, 0.0)
-        glVertex2f(-0.5, 0.0)
-        glVertex2f(-0.5, 0.0)
+        glVertex2f(0.5, -0.5)
+        glVertex2f(0.5, -0.5)
+        glVertex2f(-0.5, -0.5)
+        glVertex2f(-0.5, 0)
+        glVertex2f(0.5, 0)
+        glVertex2f(-0.5, 0)
+        glVertex2f(0.5, 0)
         glVertex2f(-0.5, 0.5)
-        glVertex2f(-0.5, 0.0)
         glVertex2f(-0.5, -0.5)
     if number == 9:
+        glVertex2f(-0.5, 0.5)
         glVertex2f(0.5, 0.5)
-        glVertex2f(-0.5, 0.5)
-        glVertex2f(-0.5, 0.5)
-        glVertex2f(-0.5, 0.0)
-        glVertex2f(-0.5, 0.0)
-        glVertex2f(0.5, 0.0)
-        glVertex2f(0.5, 0.0)
+        glVertex2f(0.5, 0.5)
         glVertex2f(0.5, -0.5)
         glVertex2f(0.5, -0.5)
         glVertex2f(-0.5, -0.5)
+        glVertex2f(-0.5, 0)
+        glVertex2f(0.5, 0)
+        glVertex2f(-0.5, 0)
+        glVertex2f(0.5, 0)
+        glVertex2f(-0.5, 0.5)
+        glVertex2f(-0.5, 0)
     elif number == 10:
-        # Desenha o 1
-        glVertex2f(0.0, -0.5)
-        glVertex2f(0.0, 0.5)
-        # Desenha o 0
+        glVertex2f(-1, -0.5)
+        glVertex2f(-1, 0.5)
         glVertex2f(-0.5, -0.5)
         glVertex2f(0.5, -0.5)
         glVertex2f(0.5, -0.5)
@@ -206,9 +242,87 @@ def DesenhaNumero(x, y, number):
 
     glPopMatrix()
 
+def CheckColisaoTela():
+    global Min,Max,Vidas,Personagens
+
+    for personagem in Personagens:
+        if(personagem.posicao.x >= Max.x or personagem.posicao.x <= Min.x) or (personagem.posicao.y >= Max.y or personagem.posicao.y <= (Max.y * -0.85)):
+                personagem.rotacao = 0
+                personagem.vetor = Ponto(0,0.2)
+                personagem.posicao = Ponto(0,0,0)
+                if(personagem == Personagens[0]): 
+                    Vidas -= 1
+
+def CheckColisaoPlayerInimigos():
+    global Min,Max,Vidas
+
+    player = Personagens[0]
+
+    playerMediaCordenadasX = player.modelo.BoundingBox[3][1] / 2
+    playerMediaCordenadasY = player.modelo.BoundingBox[3][0] / 2
+
+    playerMinX = player.posicao.x - playerMediaCordenadasX
+    playerMaxX = player.posicao.x + playerMediaCordenadasX
+
+    playerMinY = player.posicao.y - playerMediaCordenadasY
+    playerMaxY = player.posicao.y + playerMediaCordenadasY
+
+    for personagem in Personagens[1:]:
+
+        personagemMediaCordenadasX = personagem.modelo.BoundingBox[3][1] / 2
+        personagemMediaCordenadasY = personagem.modelo.BoundingBox[3][0] / 2
+
+        minX = personagem.posicao.x - personagemMediaCordenadasX
+        maxX = personagem.posicao.x + personagemMediaCordenadasX
+
+        minY = personagem.posicao.y + personagemMediaCordenadasY
+        maxY = personagem.posicao.y + personagemMediaCordenadasY
+
+        if((playerMinX <= maxX and playerMaxX >= minX) and (playerMinY <= maxY and playerMaxY >= minY)):
+            print(personagem)
+            player.posicao = Ponto(0,0,0)
+            player.rotacao = 0
+            player.vetor = Ponto(0,0.1)
+            Vidas -= 1
+
+def CheckColisaoTirosPlayerComInimigos():
+    global Min,Max,Vidas
+    
+    for tiroPlayer in TirosPlayer:
+
+        playerTiroMediaCordenadasX = tiroPlayer.modelo.BoundingBox[3][1] / 2
+        playerTiroMediaCordenadasY = tiroPlayer.modelo.BoundingBox[3][0] / 2
+
+        playerTiroMinX = tiroPlayer.posicao.x + tiroPlayer.pivot.x - playerTiroMediaCordenadasX
+        playerTiroMaxX = tiroPlayer.posicao.x + tiroPlayer.pivot.x + playerTiroMediaCordenadasX
+
+        playerTiroMinY = tiroPlayer.posicao.y + tiroPlayer.pivot.y - playerTiroMediaCordenadasY
+        playerTiroMaxY = tiroPlayer.posicao.y + tiroPlayer.pivot.y + playerTiroMediaCordenadasY
+
+        for personagem in Personagens[1:]:
+
+            personagemMediaCordenadasX = personagem.modelo.BoundingBox[3][1] / 2
+            personagemMediaCordenadasY = personagem.modelo.BoundingBox[3][0] / 2
+
+            minX = personagem.posicao.x + personagem.pivot.x - personagemMediaCordenadasX
+            maxX = personagem.posicao.x + personagem.pivot.x + personagemMediaCordenadasX
+
+            minY = personagem.posicao.y - personagemMediaCordenadasY
+            maxY = personagem.posicao.y + personagemMediaCordenadasY
+
+            if((maxX >= playerTiroMinX and minX <= playerTiroMaxX) and (maxY >= playerTiroMinY and minY <= playerTiroMaxY)):
+                indexReferencia = personagem.ordem
+                Personagens.remove(personagem)
+                for inimigos in Personagens[1:]:
+                    if(inimigos.ordem > indexReferencia):
+                        inimigos.ordem -= 1
+        
+        if(playerTiroMinY <= -75):
+
+            tiroPlayer.podeDesenhar = False
 
 def DesenhaUI():
-    global Min, Max
+    global Min, Max, AlturaUi, Municao, TotalTiro
 
     Meio = Ponto()
 
@@ -245,22 +359,55 @@ def DesenhaUI():
     glLoadIdentity()
     glPushMatrix()
     glTranslatef(UIReferenceX,UIReferenceY,0)
-    glScaled(0.2, 0.2, 1)
+    
     DesenhaPlayerUI(Player)
-    DesenhaNumero(UIReferenceX + (Max.x / 4) , UIReferenceY - 0.6 , Vidas)
+    DesenhaNumero(UIReferenceX + (Max.x / 4) , UIReferenceY - 3.5, Vidas)
+
+    glTranslatef(abs(UIReferenceX) - 3, UIReferenceY ,0)
+    DesenhaPlayerUI(TiroPlayer)
+    DesenhaNumero(abs(UIReferenceX) - (Max.x / 10) , UIReferenceY - 3.5, Municao - TotalTiro)
+    
     glPopMatrix()
 
-
-# ***********************************************************************************
 def DesenhaPersonagens():
-    for I in Personagens:
-        I.Desenha()
+    for personagens in Personagens:
+        personagens.Desenha()
+    for tiros in TirosPlayer:
+        tiros.Desenha()
+    for tiros in TirosInimigos:
+        tiros.Desenha()  
+
+def CriaTiroInimigo():
+    global Personagens
+
+    if(len(Personagens) > 1 and (len(TirosInimigos) <= 5)):
+        inimigo = Personagens[random.randint(1,len(Personagens) - 1)]
+        tiro = Instancia()
+        
+        TirosInimigos.append(tiro)
+        indexTiro = TirosInimigos.index(tiro)
+
+        player = Personagens[0]
+
+        vetorX, vetorY = 0,0
+
+        if(player.posicao.x - inimigo.posicao.x >= 0): vetorX = 0.5
+        if(player.posicao.y - inimigo.posicao.y >= 0): vetorY = 0.5
+
+        TirosInimigos[indexTiro].posicao = Ponto(inimigo.posicao.x,inimigo.posicao.y)
+        TirosInimigos[indexTiro].vetor = Ponto(vetorX,vetorY, 0)
+        TirosInimigos[indexTiro].rotacao = inimigo.rotacao
+        TirosInimigos[indexTiro].escala = Ponto (1,1,1)
+        TirosInimigos[indexTiro].pivot = Ponto(0,0,0)
+        TirosInimigos[indexTiro].modelo = TiroInimigo
+        TirosInimigos[indexTiro].ordem = indexTiro
+        TirosInimigos[indexTiro].desenhaModelo = DesenhaTiroInimigo
+        tiro.Desenha()
+    else:
+        TirosInimigos.clear()
 
 def animate():
-    global AccumDeltaT
-    global oldTime
-    global nFrames 
-    global TempoTotal
+    global AccumDeltaT,oldTime,nFrames,TempoTotal,PodeAtirar,TempoParaAtirar,TotalTiro,TempoTiroInimigo
 
     nowTime = time.time()
     dt = nowTime - oldTime
@@ -268,13 +415,37 @@ def animate():
 
     AccumDeltaT += dt
     TempoTotal += dt
-    nFrames += 1
-    
-    if AccumDeltaT > 1.0/30:  # fixa a atualizaÃ§Ã£o da tela em 30
+    nFrames += 1 
+
+    TempoTiroInimigo = TempoTotal
+
+    if(int(TempoTotal) % 3 == 0 and TempoTotal >= 1):
+        TempoTotal = 0
+        CriaTiroInimigo()
+
+    if AccumDeltaT > 1.0/30:
+        if(PodeAtirar == False):
+            TempoParaAtirar -= 1
+        if(TempoParaAtirar == 0):
+            TirosPlayer.clear()
+            TempoParaAtirar = 90
+            PodeAtirar = True
+            TotalTiro = 0  
         AccumDeltaT = 0
         display()
         glutPostRedisplay()
 
+def ContaTiro():
+    global Municao,TotalTiro, PodeAtirar
+     
+    if ((Municao - TotalTiro) == 0):
+        PodeAtirar = False
+
+def VerificaGameOver():
+    global Vidas
+
+    # if(Vidas == 0):
+    #     null
 # ***********************************************************************************
 def display():
 
@@ -286,50 +457,132 @@ def display():
 
     glLineWidth(3)
     glColor3f(1,1,1) # R, G, B  [0..1]
+    
+    ContaTiro()
+
+    VerificaGameOver()
     DesenhaUI()
     DesenhaPersonagens()
     
+    CheckColisaoTela()
+    CheckColisaoPlayerInimigos()
+    CheckColisaoTirosPlayerComInimigos()
+    
     glutSwapBuffers()
 
-# ***********************************************************************************
-# The function called whenever a key is pressed. 
-# Note the use of Python tuples to pass in: (key, x, y)
-#ESCAPE = '\033'
 ESCAPE = b'\x1b'
 def keyboard(*args):
-    print (args)
-    # If escape is pressed, kill everything.
+    global TotalTiro,PodeAtirar
+
     if args[0] == b'q':
         os._exit(0)
     if args[0] == ESCAPE:
         os._exit(0)
-# Forca o redesenho da tela
+    if args[0] == b' ' and PodeAtirar == True:
+        TirosPlayer.append(Instancia())
+        TirosPlayer[TotalTiro].posicao = Ponto(Personagens[0].posicao.x,Personagens[0].posicao.y)
+        TirosPlayer[TotalTiro].vetor = Ponto(Personagens[0].vetor.x * 3, Personagens[0].vetor.y * 3, 0)
+        TirosPlayer[TotalTiro].rotacao = Personagens[0].rotacao
+        TirosPlayer[TotalTiro].escala = Ponto (0.3,0.3,1)
+        TirosPlayer[TotalTiro].pivot = Ponto(0,0,0)
+        TirosPlayer[TotalTiro].modelo = TiroPlayer
+        TirosPlayer[TotalTiro].ordem = TotalTiro
+        TirosPlayer[TotalTiro].desenhaModelo = DesenhaTiroPlayer
+
+        TotalTiro += 1
     glutPostRedisplay()
 
-# **********************************************************************
-#  arrow_keys ( a_keys: int, x: int, y: int )   
-# **********************************************************************
 def arrow_keys(a_keys: int, x: int, y: int):
-    if a_keys == GLUT_KEY_UP:         # Se pressionar UP
-        Personagens[0].vetor.y = 0.01
+    global TotalTiro
+    
+    if a_keys == GLUT_KEY_UP:
+        Personagens[0].vetor.y = 0.5
+        Personagens[0].vetor.x = 0
         Personagens[0].rotacao = 0
         Personagens[0].pivot = Ponto(-4,-8,0)
-    if a_keys == GLUT_KEY_DOWN:       # Se pressionar DOWN
-        Personagens[0].vetor.y = -0.01
+    if a_keys == GLUT_KEY_DOWN:       
+        Personagens[0].vetor.y = -0.5
+        Personagens[0].vetor.x = 0
         Personagens[0].rotacao = 180
-        #Personagens[0].pivot = Ponto(1.5,-0.5,0)
-    if a_keys == GLUT_KEY_LEFT:       # Se pressionar LEFT
-        Personagens[0].vetor.x = -0.01
-        Personagens[0].rotacao += 30
-    if a_keys == GLUT_KEY_RIGHT:
-        Personagens[0].vetor.x = 0.01
-        Personagens[0].rotacao -= 30
+    
+    else:
+        rotacao = Personagens[0].rotacao
+            
+        if(rotacao == 0):
+            if (a_keys == GLUT_KEY_LEFT):
+                Personagens[0].vetor.x = -0.5
+                Personagens[0].vetor.y = 0.5
+                Personagens[0].rotacao = 45
+            if (a_keys == GLUT_KEY_RIGHT):
+                Personagens[0].vetor.x = 0.5
+                Personagens[0].vetor.y = 0.5
+                Personagens[0].rotacao = -45
+        elif(rotacao == 45):
+            if (a_keys == GLUT_KEY_LEFT):
+                Personagens[0].vetor.x = -0.5
+                Personagens[0].vetor.y = 0
+                Personagens[0].rotacao = 90
+            if (a_keys == GLUT_KEY_RIGHT):
+                Personagens[0].vetor.x = 0
+                Personagens[0].vetor.y = 0.5
+                Personagens[0].rotacao = 0
+        elif(rotacao == 90):
+            if (a_keys == GLUT_KEY_LEFT):
+                Personagens[0].vetor.x = -0.5
+                Personagens[0].vetor.y = -0.5
+                Personagens[0].rotacao = 135
+            if (a_keys == GLUT_KEY_RIGHT):
+                Personagens[0].vetor.x = -0.5
+                Personagens[0].vetor.y = 0.5
+                Personagens[0].rotacao = 45
+        elif(rotacao == 135):
+            if (a_keys == GLUT_KEY_LEFT):
+                Personagens[0].vetor.x = -0.5
+                Personagens[0].vetor.y = 0
+                Personagens[0].rotacao = 90
+            if (a_keys == GLUT_KEY_RIGHT):
+                Personagens[0].vetor.x = 0
+                Personagens[0].vetor.y = -0.5
+                Personagens[0].rotacao = 180
+        elif(rotacao == 180):
+            if (a_keys == GLUT_KEY_LEFT):
+                Personagens[0].vetor.x = -0.5
+                Personagens[0].vetor.y = -0.5
+                Personagens[0].rotacao = 135
+            if (a_keys == GLUT_KEY_RIGHT):
+                Personagens[0].vetor.x = 0.5
+                Personagens[0].vetor.y = -0.5
+                Personagens[0].rotacao = -135
+        elif(rotacao == -135):
+            if (a_keys == GLUT_KEY_LEFT):
+                Personagens[0].vetor.x = 0
+                Personagens[0].vetor.y = -0.5
+                Personagens[0].rotacao = 180
+            if (a_keys == GLUT_KEY_RIGHT):
+                Personagens[0].vetor.x = 0.5
+                Personagens[0].vetor.y = 0
+                Personagens[0].rotacao = -90
+        elif(rotacao == -90):
+            if (a_keys == GLUT_KEY_LEFT):
+                Personagens[0].vetor.x = 0.5
+                Personagens[0].vetor.y = 0.5
+                Personagens[0].rotacao = -45
+            if (a_keys == GLUT_KEY_RIGHT):
+                Personagens[0].vetor.x = 0.5
+                Personagens[0].vetor.y = -0.5
+                Personagens[0].rotacao = -135
+        elif(rotacao == -45):
+            if (a_keys == GLUT_KEY_LEFT):
+                Personagens[0].vetor.x = 0
+                Personagens[0].vetor.y = 0.5
+                Personagens[0].rotacao = 0
+            if (a_keys == GLUT_KEY_RIGHT):
+                Personagens[0].vetor.x = 0.5
+                Personagens[0].vetor.y = 0
+                Personagens[0].rotacao = -90
 
     glutPostRedisplay()
 
-# ***********************************************************************************
-#
-# ***********************************************************************************
 def mouse(button: int, state: int, x: int, y: int):
     global PontoClicado
     if (state != GLUT_DOWN): 
@@ -354,38 +607,64 @@ def mouseMove(x: int, y: int):
     #glutPostRedisplay()
     return
 
-def CarregaModelos():
-    global Player, Tiro
-
-    
-    Player.LePontosDeArquivo("Personagens\Player.txt")
-    Tiro.LePontosDeArquivo("Personagens\Tiro.txt")
-
 def CriaInstancias():
-    global Personagens
+    global Personagens, NumeroInicialDeInimigos
+
+    NumeroInicialDeInimigos = 10
 
     Personagens.append(Instancia())
-    Personagens[0].modelo = DesenhaPlayer
     Personagens[0].posicao = Ponto(0,0)
     Personagens[0].escala = Ponto (0.2,0.2,1)
     Personagens[0].pivot = Ponto(-4,-8,0)
+    Personagens[0].modelo = Player
+    Personagens[0].desenhaModelo = DesenhaPersonagem
+
+    for inimigo in range(NumeroInicialDeInimigos):
+        inimigo1RandomX1 = random.uniform(-90,0)
+        inimigo1RandomX2 = random.uniform(90,0)
+        
+        inimigo1RandomY1 = random.uniform(-75,0)
+        inimigo1RandomY2 = random.uniform(10,0)
+        
+        modeloInimigo = random.randint(0,2)
+
+        inimigo1X = inimigo1RandomX1 + inimigo1RandomX2
+        inimigo1Y = inimigo1RandomY1 + inimigo1RandomY2
+
+        ListaDeModelos.append(Polygon(("Personagens\inimigo"+str(modeloInimigo+1)+".txt")))
+        novoInimigo = Instancia()
+        novoInimigo.posicao = Ponto(inimigo1X,inimigo1Y)
+        
+        Personagens.append(novoInimigo)
+        indexInimigo = len(Personagens) - 1
+
+        Personagens[indexInimigo].escala = Ponto (0,0,0)
+        Personagens[indexInimigo].vetor = Ponto (0,0,0)
+        Personagens[indexInimigo].pivot = Ponto(-4,-8,0)
+        Personagens[indexInimigo].modelo = ListaDeModelos[inimigo]
+        Personagens[indexInimigo].ordem = indexInimigo
+        Personagens[indexInimigo].desenhaModelo = DesenhaPersonagem
 
 def init():
-    global Min, Max
-    glClearColor(0, 0, 0, 1)
-
-    CarregaModelos()
-    CriaInstancias()
-
-    d:float = 20
+    global Min, Max,NumeroInicialDeInimigos
+    
+    d:float = 100
     Min = Ponto(-d,-d)
     Max = Ponto(d,d)
+    
+    MaxX = (Max.x * 2) - 40
+    MaxY = Max.y + 75 - 40
+    #Quad = QuadTree(MaxX,MaxY)
+    
+    glClearColor(0, 0, 0, 1)
+    CriaInstancias()
+
 
 
 glutInit(sys.argv)
 glutInitDisplayMode(GLUT_RGBA)
-glutInitWindowSize(1080, 920)
-glutInitWindowPosition(850, 75)
+glutInitWindowSize(900, 800)
+glutInitWindowPosition(0, 0)
 wind = glutCreateWindow("Trabalho 1")
 glutDisplayFunc(display)
 glutIdleFunc(animate)

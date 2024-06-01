@@ -9,7 +9,7 @@ class Instancia:
         self.posicao = Ponto (0,0,0) 
         self.escala = Ponto (1,1,1)
         self.rotacao:float = 0.0
-        self.vetor = Ponto(0,0.5)
+        self.vetor = Ponto(0,0.2)
         self.pivot:Ponto
         self.desenhaModelo:None
         self.modelo:Polygon

@@ -7,7 +7,7 @@ from OpenGL.GLU import *
 
 from Poligonos import *
 from Instancia import *
-#from QuadTree import *
+from QuadTree import *
 
 # Modelos de Objetos
 Player = Polygon("Personagens\Player.txt")
@@ -21,6 +21,7 @@ Curva1 = []
 # Limites da Janela de Seleção
 Min = Ponto()
 Max = Ponto()
+Quad = None
 
 # lista de instancias do Personagens
 Personagens = []
@@ -28,6 +29,7 @@ TirosPlayer = []
 TirosInimigos = []
 TotalTiro = 0
 PodeAtirar = True
+FoiAtingido = False
 TempoParaAtirar = 90
 Municao = 10
 TempoTiroInimigo = 0
@@ -42,12 +44,11 @@ def DesenhaLinha (P1, P2):
     glVertex3f(P2.x,P2.y,P2.z)
     glEnd()
 
-# ****************************************************************
 def RotacionaAoRedorDeUmPonto(alfa: float, P: Ponto):
     glTranslatef(P.x, P.y, P.z)
     glRotatef(alfa, 0,0,1)
     glTranslatef(-P.x, -P.y, -P.z)
-# ***********************************************************************************
+
 def reshape(w,h):
 
     global Min, Max
@@ -243,50 +244,50 @@ def DesenhaNumero(x, y, number):
     glPopMatrix()
 
 def CheckColisaoTela():
-    global Min,Max,Vidas,Personagens
+    global Min,Max,Vidas,Personagens,FoiAtingido
 
     for personagem in Personagens:
-        if(personagem.posicao.x >= Max.x or personagem.posicao.x <= Min.x) or (personagem.posicao.y >= Max.y or personagem.posicao.y <= (Max.y * -0.85)):
+        if(personagem.posicao.x >= Max.x or personagem.posicao.x <= Min.x) or (personagem.posicao.y >= Max.y or personagem.posicao.y <= (Max.y * -0.70)):
                 personagem.rotacao = 0
-                personagem.vetor = Ponto(0,0.2)
+                personagem.vetor = geraVetorAleatorio()
                 personagem.posicao = Ponto(0,0,0)
                 if(personagem == Personagens[0]): 
-                    Vidas -= 1
+                    FoiAtingido = True
+                    personagem.vetor = Ponto(0,0.5,0)
 
 def CheckColisaoPlayerInimigos():
-    global Min,Max,Vidas
+    global Min,Max,Vidas,FoiAtingido
 
     player = Personagens[0]
 
     playerMediaCordenadasX = player.modelo.BoundingBox[3][1] / 2
     playerMediaCordenadasY = player.modelo.BoundingBox[3][0] / 2
 
-    playerMinX = player.posicao.x - playerMediaCordenadasX
+    playerMinX = player.posicao.x + player.pivot.x - playerMediaCordenadasX
     playerMaxX = player.posicao.x + playerMediaCordenadasX
 
-    playerMinY = player.posicao.y - playerMediaCordenadasY
-    playerMaxY = player.posicao.y + playerMediaCordenadasY
+    playerMinY = player.posicao.y + player.pivot.y - playerMediaCordenadasY
+    playerMaxY = player.posicao.y + player.pivot.y + playerMediaCordenadasY
 
     for personagem in Personagens[1:]:
 
         personagemMediaCordenadasX = personagem.modelo.BoundingBox[3][1] / 2
         personagemMediaCordenadasY = personagem.modelo.BoundingBox[3][0] / 2
 
-        minX = personagem.posicao.x - personagemMediaCordenadasX
-        maxX = personagem.posicao.x + personagemMediaCordenadasX
+        minX = personagem.posicao.x + personagem.pivot.x - personagemMediaCordenadasX
+        maxX = personagem.posicao.x + personagem.pivot.x + personagemMediaCordenadasX
 
-        minY = personagem.posicao.y + personagemMediaCordenadasY
-        maxY = personagem.posicao.y + personagemMediaCordenadasY
+        minY = personagem.posicao.y + personagem.pivot.y - personagemMediaCordenadasY
+        maxY = personagem.posicao.y + personagem.pivot.y + personagemMediaCordenadasY
 
         if((playerMinX <= maxX and playerMaxX >= minX) and (playerMinY <= maxY and playerMaxY >= minY)):
-            print(personagem)
             player.posicao = Ponto(0,0,0)
             player.rotacao = 0
             player.vetor = Ponto(0,0.1)
-            Vidas -= 1
+            FoiAtingido = True
 
-def CheckColisaoTirosPlayerComInimigos():
-    global Min,Max,Vidas
+def CheckColisaoTirosComEntidades():
+    global Min,Max,Vidas,FoiAtingido
     
     for tiroPlayer in TirosPlayer:
 
@@ -318,11 +319,42 @@ def CheckColisaoTirosPlayerComInimigos():
                         inimigos.ordem -= 1
         
         if(playerTiroMinY <= -75):
-
             tiroPlayer.podeDesenhar = False
 
+    player = Personagens[0]
+
+    playerMediaCordenadasX = player.modelo.BoundingBox[3][1] / 2
+    playerMediaCordenadasY = player.modelo.BoundingBox[3][0] / 2
+
+    minX = player.posicao.x - playerMediaCordenadasX
+    maxX = player.posicao.x + playerMediaCordenadasX
+
+    minY = player.posicao.y - playerMediaCordenadasY
+    maxY = player.posicao.y + playerMediaCordenadasY
+    
+    for tiroInimigo in TirosInimigos:
+        tiroInimigoMediaCordenadasX = tiroInimigo.modelo.BoundingBox[3][1] / 2
+        tiroInimigoMediaCordenadasY = tiroInimigo.modelo.BoundingBox[3][0] / 2
+
+        tiroInimigoMinX = tiroInimigo.posicao.x + tiroInimigo.pivot.x - tiroInimigoMediaCordenadasX
+        tiroInimigoMaxX = tiroInimigo.posicao.x + tiroInimigo.pivot.x + tiroInimigoMediaCordenadasX
+
+        tiroInimigoMinY = tiroInimigo.posicao.y + tiroInimigo.pivot.y - tiroInimigoMediaCordenadasY
+        tiroInimigoMaxY = tiroInimigo.posicao.y + tiroInimigo.pivot.y + tiroInimigoMediaCordenadasY
+
+        if((maxX >= tiroInimigoMinX and minX <= tiroInimigoMaxX) and (maxY >= tiroInimigoMinY and minY <= tiroInimigoMaxY)):
+            tiroInimigo.podeDesenhar = False
+            player.posicao = Ponto(0,0,0)
+            player.rotacao = 0
+            player.vetor = Ponto(0,0.1)
+            TirosInimigos.remove(tiroInimigo)
+            FoiAtingido = True
+
+        if(tiroInimigoMinY <= -75):
+            tiroInimigo.podeDesenhar = False
+
 def DesenhaUI():
-    global Min, Max, AlturaUi, Municao, TotalTiro
+    global Min, Max, AlturaUi, Municao, TotalTiro,Vidas
 
     Meio = Ponto()
 
@@ -331,15 +363,8 @@ def DesenhaUI():
     Meio.z = (Max.z+Min.z)/2
 
     AlturaUi = ((Max.y + abs(Min.y)) / 8 ) + (Min.y)
-
+    
     glBegin(GL_LINES)
-    #  eixo horizontal
-    glVertex2f(Min.x,Meio.y)
-    glVertex2f(Max.x,Meio.y)
-    #  eixo vertical
-    glVertex2f(Meio.x,Min.y)
-    glVertex2f(Meio.x,Max.y)
-
     #barra superior da UI
     glVertex2f(Min.x, AlturaUi)
     glVertex2f(Max.x, AlturaUi)
@@ -369,6 +394,25 @@ def DesenhaUI():
     
     glPopMatrix()
 
+    if(len(Personagens) == 1 and Personagens[0].modelo == Player):
+        glLineWidth(3)
+        glColor3f(1,1,1)
+        glScalef(0.2,0.2,0.2) 
+        glPushMatrix()
+        glTranslatef(-400, 0, 0)
+        for character in "Voce Venceu":
+            glutStrokeCharacter(GLUT_STROKE_ROMAN, ord(character))
+        glPopMatrix()
+    elif(Vidas == 0):
+        glLineWidth(3)
+        glColor3f(1,1,1)
+        glScalef(0.2,0.2,0.2) 
+        glPushMatrix()
+        glTranslatef(-350, 0, 0)
+        for character in "Game Over":
+            glutStrokeCharacter(GLUT_STROKE_ROMAN, ord(character))
+        glPopMatrix()
+
 def DesenhaPersonagens():
     for personagens in Personagens:
         personagens.Desenha()
@@ -380,7 +424,7 @@ def DesenhaPersonagens():
 def CriaTiroInimigo():
     global Personagens
 
-    if(len(Personagens) > 1 and (len(TirosInimigos) <= 5)):
+    if(len(Personagens) > 1 and (len(TirosInimigos) <= 15)):
         inimigo = Personagens[random.randint(1,len(Personagens) - 1)]
         tiro = Instancia()
         
@@ -388,15 +432,31 @@ def CriaTiroInimigo():
         indexTiro = TirosInimigos.index(tiro)
 
         player = Personagens[0]
-
         vetorX, vetorY = 0,0
+        rotacao = 0
 
-        if(player.posicao.x - inimigo.posicao.x >= 0): vetorX = 0.5
-        if(player.posicao.y - inimigo.posicao.y >= 0): vetorY = 0.5
+        if(player.posicao.x > inimigo.posicao.x + 10):
+            vetorX = 0.75
+        elif(player.posicao.x < inimigo.posicao.x - 10):
+            vetorX = -0.75
+
+        if(player.posicao.y > inimigo.posicao.y + 10):
+            vetorY = 0.75
+        elif(player.posicao.y < inimigo.posicao.y - 10):
+            vetorY = -0.75
+
+        if(vetorX == 1 and vetorY == 0):rotacao = -90
+        if(vetorX == 1 and vetorY == 1):rotacao = -45
+        if(vetorX == 1 and vetorY == -1):rotacao = -135
+        if(vetorX == 0 and vetorY == -1):rotacao = 180
+        if(vetorX == -1 and vetorY == -1):rotacao = 135
+        if(vetorX == -1 and vetorY == 0):rotacao = 90
+        if(vetorX == -1 and vetorY == -1):rotacao = 45
+            
 
         TirosInimigos[indexTiro].posicao = Ponto(inimigo.posicao.x,inimigo.posicao.y)
         TirosInimigos[indexTiro].vetor = Ponto(vetorX,vetorY, 0)
-        TirosInimigos[indexTiro].rotacao = inimigo.rotacao
+        TirosInimigos[indexTiro].rotacao = rotacao
         TirosInimigos[indexTiro].escala = Ponto (1,1,1)
         TirosInimigos[indexTiro].pivot = Ponto(0,0,0)
         TirosInimigos[indexTiro].modelo = TiroInimigo
@@ -406,8 +466,12 @@ def CriaTiroInimigo():
     else:
         TirosInimigos.clear()
 
+def MudaVetorInimigos():
+    for inimigo in Personagens[1:]:
+        inimigo.vetor = geraVetorAleatorio()
+
 def animate():
-    global AccumDeltaT,oldTime,nFrames,TempoTotal,PodeAtirar,TempoParaAtirar,TotalTiro,TempoTiroInimigo
+    global AccumDeltaT,oldTime,nFrames,TempoTotal,PodeAtirar,TempoParaAtirar,TotalTiro,TempoTiroInimigo,Vidas,FoiAtingido
 
     nowTime = time.time()
     dt = nowTime - oldTime
@@ -419,11 +483,10 @@ def animate():
 
     TempoTiroInimigo = TempoTotal
 
-    if(int(TempoTotal) % 3 == 0 and TempoTotal >= 1):
-        TempoTotal = 0
-        CriaTiroInimigo()
-
     if AccumDeltaT > 1.0/30:
+        if(FoiAtingido == True):
+            FoiAtingido = False
+            if(Vidas > 0): Vidas -= 1
         if(PodeAtirar == False):
             TempoParaAtirar -= 1
         if(TempoParaAtirar == 0):
@@ -431,9 +494,19 @@ def animate():
             TempoParaAtirar = 90
             PodeAtirar = True
             TotalTiro = 0  
+        
         AccumDeltaT = 0
-        display()
-        glutPostRedisplay()
+    
+    if(int(TempoTotal) % 2 == 0 and TempoTotal >= 1):
+        CriaTiroInimigo()
+        MudaVetorInimigos()
+        TempoTotal = 0
+
+    if Vidas == 0:
+        Personagens[0].podeDesenhar = False
+
+    display()
+    glutPostRedisplay()
 
 def ContaTiro():
     global Municao,TotalTiro, PodeAtirar
@@ -441,12 +514,6 @@ def ContaTiro():
     if ((Municao - TotalTiro) == 0):
         PodeAtirar = False
 
-def VerificaGameOver():
-    global Vidas
-
-    # if(Vidas == 0):
-    #     null
-# ***********************************************************************************
 def display():
 
 	# Limpa a tela coma cor de fundo
@@ -460,25 +527,24 @@ def display():
     
     ContaTiro()
 
-    VerificaGameOver()
     DesenhaUI()
     DesenhaPersonagens()
     
     CheckColisaoTela()
     CheckColisaoPlayerInimigos()
-    CheckColisaoTirosPlayerComInimigos()
+    CheckColisaoTirosComEntidades()
     
     glutSwapBuffers()
 
-ESCAPE = b'\x1b'
 def keyboard(*args):
+    ESCAPE = b'\x1b'
     global TotalTiro,PodeAtirar
 
     if args[0] == b'q':
         os._exit(0)
     if args[0] == ESCAPE:
         os._exit(0)
-    if args[0] == b' ' and PodeAtirar == True:
+    if args[0] == b' ' and PodeAtirar == True and Vidas != 0:
         TirosPlayer.append(Instancia())
         TirosPlayer[TotalTiro].posicao = Ponto(Personagens[0].posicao.x,Personagens[0].posicao.y)
         TirosPlayer[TotalTiro].vetor = Ponto(Personagens[0].vetor.x * 3, Personagens[0].vetor.y * 3, 0)
@@ -556,7 +622,7 @@ def arrow_keys(a_keys: int, x: int, y: int):
         elif(rotacao == -135):
             if (a_keys == GLUT_KEY_LEFT):
                 Personagens[0].vetor.x = 0
-                Personagens[0].vetor.y = -0.5
+                Personagens[0].vetor.y = 0.5
                 Personagens[0].rotacao = 180
             if (a_keys == GLUT_KEY_RIGHT):
                 Personagens[0].vetor.x = 0.5
@@ -607,10 +673,40 @@ def mouseMove(x: int, y: int):
     #glutPostRedisplay()
     return
 
+def geraVetorAleatorio():
+    novoVetor = Ponto(0,0,0)
+    movimento = [0,0.1,-0.1]
+
+    while novoVetor.x == 0 and novoVetor.y == 0:
+        novoVetor = Ponto(random.choice(movimento),random.choice(movimento),0)
+
+    return novoVetor
+
+def gerarInimigoAleatorio():
+    while True:
+        x = random.uniform(-90, 90)
+        y = random.uniform(-100, 90)
+        if not (-20 <= x <= 20 and -20 <= y <= 20) and (20 <= y <= 100 or -65 <= y <= -20):
+            novoInimigo = Instancia()
+            
+            novoInimigo.posicao = Ponto(x,y)
+            novoInimigo.escala = Ponto(0,0,0)
+            novoInimigo.pivot = Ponto(-4,-8,0)
+            novoInimigo.ordem = len(Personagens)
+            novoInimigo.desenhaModelo = DesenhaPersonagem
+            novoInimigo.vetor = geraVetorAleatorio()
+            
+            modeloInimigo = random.randint(1,3)
+            ListaDeModelos.append(Polygon(("Personagens\inimigo"+str(modeloInimigo)+".txt")))
+            novoInimigo.modelo = ListaDeModelos[len(Personagens) - 1]
+            
+            Quad.inserir(novoInimigo)
+            return novoInimigo
+    
 def CriaInstancias():
     global Personagens, NumeroInicialDeInimigos
 
-    NumeroInicialDeInimigos = 10
+    NumeroInicialDeInimigos = 60
 
     Personagens.append(Instancia())
     Personagens[0].posicao = Ponto(0,0)
@@ -619,34 +715,11 @@ def CriaInstancias():
     Personagens[0].modelo = Player
     Personagens[0].desenhaModelo = DesenhaPersonagem
 
-    for inimigo in range(NumeroInicialDeInimigos):
-        inimigo1RandomX1 = random.uniform(-90,0)
-        inimigo1RandomX2 = random.uniform(90,0)
-        
-        inimigo1RandomY1 = random.uniform(-75,0)
-        inimigo1RandomY2 = random.uniform(10,0)
-        
-        modeloInimigo = random.randint(0,2)
-
-        inimigo1X = inimigo1RandomX1 + inimigo1RandomX2
-        inimigo1Y = inimigo1RandomY1 + inimigo1RandomY2
-
-        ListaDeModelos.append(Polygon(("Personagens\inimigo"+str(modeloInimigo+1)+".txt")))
-        novoInimigo = Instancia()
-        novoInimigo.posicao = Ponto(inimigo1X,inimigo1Y)
-        
-        Personagens.append(novoInimigo)
-        indexInimigo = len(Personagens) - 1
-
-        Personagens[indexInimigo].escala = Ponto (0,0,0)
-        Personagens[indexInimigo].vetor = Ponto (0,0,0)
-        Personagens[indexInimigo].pivot = Ponto(-4,-8,0)
-        Personagens[indexInimigo].modelo = ListaDeModelos[inimigo]
-        Personagens[indexInimigo].ordem = indexInimigo
-        Personagens[indexInimigo].desenhaModelo = DesenhaPersonagem
+    for _ in range(NumeroInicialDeInimigos):
+        Personagens.append(gerarInimigoAleatorio())    
 
 def init():
-    global Min, Max,NumeroInicialDeInimigos
+    global Min, Max, Quad
     
     d:float = 100
     Min = Ponto(-d,-d)
@@ -654,12 +727,10 @@ def init():
     
     MaxX = (Max.x * 2) - 40
     MaxY = Max.y + 75 - 40
-    #Quad = QuadTree(MaxX,MaxY)
+    Quad = QuadTree(MaxX,MaxY)
     
     glClearColor(0, 0, 0, 1)
     CriaInstancias()
-
-
 
 glutInit(sys.argv)
 glutInitDisplayMode(GLUT_RGBA)
